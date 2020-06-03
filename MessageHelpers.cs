@@ -140,7 +140,7 @@ namespace PlanningPoker
             };
             message.Blocks[^1] = new Section()
             {
-                Text = new MarkdownText(string.IsNullOrEmpty(sb.ToString()) ? "No one voted." : sb.ToString())
+                Text = new MarkdownText(!results.Any() ? "No one voted." : sb.ToString())
             };
             return message;
         }
