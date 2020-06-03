@@ -4,7 +4,9 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
+using Slack.NetStandard;
 using Slack.NetStandard.Interaction;
+using Slack.NetStandard.WebApi.Chat;
 
 namespace PlanningPoker.Controllers
 {
@@ -12,11 +14,12 @@ namespace PlanningPoker.Controllers
     [Route("[controller]")]
     public class PlanningPokerController : ControllerBase
     {
-        private readonly IVotesRepository votesRepository;
+        private readonly IPokerHandRepository _pokerHandRepository;
+        private readonly ISlackApiClient slackClient = new SlackWebApiClient("");
 
-        public PlanningPokerController(IVotesRepository votesRepository)
+        public PlanningPokerController(IPokerHandRepository pokerHandRepository)
         {
-            this.votesRepository = votesRepository;
+            this._pokerHandRepository = pokerHandRepository;
         }
 
         [Route("[action]")]
@@ -27,13 +30,24 @@ namespace PlanningPoker.Controllers
 
             if (p.Actions.Single().Value == Constants.CloseVote)
             {
-                IDictionary<string, string> results = votesRepository.GetVotes(p.Message.Timestamp.Identifier);
-                var message = MessageHelpers.GetMessageWithVotesClosed(p.Message.Blocks, results, p.User.Username);
+                var pokerHand = _pokerHandRepository.GetPokerHand(p.Message.Timestamp.Identifier);
+                var setOfGroups = new List<IList<string>>();
+                foreach (var g in pokerHand.UserGroups)
+                {
+                    var group = await slackClient.Usergroups.Users.List(g);
+                    var newGroupList = group.Users;
+                    setOfGroups.Add(newGroupList);
+                }
+
+                var message =
+                    MessageHelpers.GetMessageWithVotesClosed(p.Message.Blocks, setOfGroups, pokerHand.Votes,
+                        p.User.Username);
                 await message.Send(p.ResponseUrl);
             }
             else
             {
-                var wasVoteAdded = votesRepository.AddVote(p.Message.Timestamp.Identifier, p.User.Username,
+                var wasVoteAdded = _pokerHandRepository.AddVote(p.Message.Timestamp.Identifier, p.User.ID,
+                    p.User.Username,
                     p.Actions.Single().Value);
                 if (wasVoteAdded)
                 {
@@ -69,8 +83,7 @@ namespace PlanningPoker.Controllers
             }
             else
             {
-                var users = "";
-                var whatToDeal = "";
+                var userGroupIDs = new List<string>();
                 var x = 0;
                 while (x < arguments.Length)
                 {
@@ -83,8 +96,8 @@ namespace PlanningPoker.Controllers
 
                     if (Regex.Match(arguments[x], @"<!subteam\^.*>").Success)
                     {
-                        //todo check if valid user group else throw
-                        users += (arguments[x]);
+                        var userGroupId = arguments[x].Substring(10).Split('|')[0];
+                        userGroupIDs.Add(userGroupId);
                     }
                     else
                     {
@@ -94,7 +107,7 @@ namespace PlanningPoker.Controllers
                     x++;
                 }
 
-                whatToDeal = string.Join(' ', arguments.Skip(x));
+                var whatToDeal = string.Join(' ', arguments.Skip(x));
 
                 if (string.IsNullOrEmpty(whatToDeal))
                 {
@@ -105,11 +118,17 @@ namespace PlanningPoker.Controllers
                 else
                 {
                     var message = MessageHelpers.CreateDealtMessage(slashCommand.Username, whatToDeal);
-                    await message.Send(slashCommand.ResponseUrl);
+                    var request = new PostMessageRequest
+                    {
+                        Channel = slashCommand.ChannelId
+                    };
+                    request.Blocks = message.Blocks;
+                    var response = await slackClient.Chat.Post(request);
+                    _pokerHandRepository.AddPokerHand(response.Timestamp.Identifier, userGroupIDs);
                 }
             }
 
-            return Ok();
+            return Ok("Just a moment...");
         }
     }
 }

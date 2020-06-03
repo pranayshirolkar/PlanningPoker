@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Microsoft.VisualBasic;
 using Slack.NetStandard;
 using Slack.NetStandard.Interaction;
 using Slack.NetStandard.Messages.Blocks;
@@ -78,23 +77,30 @@ namespace PlanningPoker
         }
 
         public static InteractionMessage GetMessageWithVotesClosed(IList<IMessageBlock> blocks,
-            IDictionary<string, string> results,
+            List<IList<string>> setOfGroups,
+            IDictionary<string, Vote> results,
             string username)
         {
             var sb = new StringBuilder();
-            var grouped = results
-                .OrderBy(v => v.Value)
-                .GroupBy(vote => vote.Value);
-            foreach (var v in grouped)
-            {
-                sb.Append(v.Key + ": ");
-                foreach (var g in v)
-                {
-                    sb.Append("@" + g.Key + ", ");
-                }
 
-                sb.Remove(sb.Length - 2, 1);
+            foreach (var userGroup in setOfGroups)
+            {
+                sb.Append("Group: ");
                 sb.Append(Environment.NewLine);
+                var grouped = results.Where(r => userGroup.Contains(r.Key))
+                    .OrderBy(v => v.Value.Value)
+                    .GroupBy(vote => vote.Value.Value);
+                foreach (var v in grouped)
+                {
+                    sb.Append(v.Key + ": ");
+                    foreach (var g in v)
+                    {
+                        sb.Append("@" + g.Value.Username + ", ");
+                    }
+
+                    sb.Remove(sb.Length - 2, 1);
+                    sb.Append(Environment.NewLine);
+                }
             }
 
             var message = new InteractionMessage(replaceOriginal: true);

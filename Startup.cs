@@ -30,7 +30,7 @@ namespace PlanningPoker
                 // .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
                 ;
             
-            services.AddSingleton<IVotesRepository, VotesRepository>();
+            services.AddSingleton<IPokerHandRepository, PokerHandRepository>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
