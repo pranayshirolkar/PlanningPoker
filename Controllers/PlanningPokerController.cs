@@ -128,7 +128,7 @@ namespace PlanningPoker.Controllers
                 }
             }
 
-            return Ok("Just a moment...");
+            return Ok();
         }
     }
 }
