@@ -4,9 +4,9 @@ namespace PlanningPoker
 {
     public interface IPokerHandRepository
     {
-        void AddPokerHand(string messageId, IList<string> userGroups);
+        void AddPokerHand(string messageId, IList<UserGroup> userGroups);
 
-        bool AddVote(string messageId, string userID, string username, string value);
+        bool AddVote(string messageId, string userId, string username, string value);
 
         PokerHand GetPokerHand(string messageId);
     }
@@ -20,7 +20,19 @@ namespace PlanningPoker
     public class PokerHand
     {
         public IDictionary<string, Vote> Votes { get; set; }
-        public IList<string> UserGroups { get; set; }
+        public IList<UserGroup> UserGroups { get; set; }
+    }
+
+    public class UserGroupWithUsers
+    {
+        public string UserGroupHandle { get; set; }
+        public IList<string> UserIds { get; set; }
+    }
+
+    public class UserGroup
+    {
+        public string UserGroupId { get; set; }
+        public string UserGroupHandle { get; set; }
     }
 
     public class PokerHandRepository : IPokerHandRepository
@@ -32,7 +44,7 @@ namespace PlanningPoker
             this.pokerHandsStore = new Dictionary<string, PokerHand>();
         }
 
-        public void AddPokerHand(string messageId, IList<string> userGroups)
+        public void AddPokerHand(string messageId, IList<UserGroup> userGroups)
         {
             pokerHandsStore[messageId] = new PokerHand()
             {
@@ -41,12 +53,12 @@ namespace PlanningPoker
             };
         }
 
-        public bool AddVote(string messageId, string userID, string username, string value)
+        public bool AddVote(string messageId, string userId, string username, string value)
         {
             var pokerHand = pokerHandsStore[messageId];
-            if (pokerHand.Votes.ContainsKey(userID))
+            if (pokerHand.Votes.ContainsKey(userId))
             {
-                pokerHand.Votes[userID] = new Vote()
+                pokerHand.Votes[userId] = new Vote()
                 {
                     Username = username,
                     Value = value
@@ -54,7 +66,7 @@ namespace PlanningPoker
                 return false;
             }
 
-            pokerHand.Votes[userID] = new Vote()
+            pokerHand.Votes[userId] = new Vote()
             {
                 Username = username,
                 Value = value

@@ -107,7 +107,7 @@ namespace PlanningPoker
         }
 
         public static InteractionMessage GetMessageWithVotesClosed(IList<IMessageBlock> blocks,
-            List<IList<string>> setOfGroups,
+            List<UserGroupWithUsers> setOfGroups,
             IDictionary<string, Vote> results,
             string username)
         {
@@ -117,9 +117,9 @@ namespace PlanningPoker
             {
                 foreach (var userGroup in setOfGroups)
                 {
-                    sb.Append("Group: ");
+                    sb.Append("Votes from @" + userGroup.UserGroupHandle + ":");
                     sb.Append(Environment.NewLine);
-                    HandleOutput(results, userGroup, sb);
+                    HandleOutput(results, userGroup.UserIds, sb);
                 }    
             }
             else
@@ -152,13 +152,14 @@ namespace PlanningPoker
                 .GroupBy(vote => vote.Value.Value);
             foreach (var v in grouped)
             {
-                sb.Append(v.Key + ": ");
+                sb.Append("```" + v.Key + ": ");
                 foreach (var g in v)
                 {
                     sb.Append("@" + g.Value.Username + ", ");
                 }
 
                 sb.Remove(sb.Length - 2, 1);
+                sb.Append("```");
                 sb.Append(Environment.NewLine);
             }
         }

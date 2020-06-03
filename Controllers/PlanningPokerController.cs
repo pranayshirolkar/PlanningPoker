@@ -31,12 +31,16 @@ namespace PlanningPoker.Controllers
             if (p.Actions.Single().Value == Constants.CloseVote)
             {
                 var pokerHand = _pokerHandRepository.GetPokerHand(p.Message.Timestamp.Identifier);
-                var setOfGroups = new List<IList<string>>();
+                var setOfGroups = new List<UserGroupWithUsers>();
                 foreach (var g in pokerHand.UserGroups)
                 {
-                    var group = await slackClient.Usergroups.Users.List(g);
+                    var group = await slackClient.Usergroups.Users.List(g.UserGroupId);
                     var newGroupList = group.Users;
-                    setOfGroups.Add(newGroupList);
+                    setOfGroups.Add(new UserGroupWithUsers()
+                    {
+                        UserIds = newGroupList,
+                        UserGroupHandle = g.UserGroupHandle
+                    });
                 }
 
                 var message =
@@ -83,7 +87,8 @@ namespace PlanningPoker.Controllers
             }
             else
             {
-                var userGroupIDs = new List<string>();
+                var allUserGroups = await slackClient.Usergroups.List();
+                var userGroups = new List<UserGroup>();
                 var x = 0;
                 while (x < arguments.Length)
                 {
@@ -97,7 +102,12 @@ namespace PlanningPoker.Controllers
                     if (Regex.Match(arguments[x], @"<!subteam\^.*>").Success)
                     {
                         var userGroupId = arguments[x].Substring(10).Split('|')[0];
-                        userGroupIDs.Add(userGroupId);
+                        var userGroupHandle = allUserGroups.Usergroups.Single(g => g.ID.Equals(userGroupId)).Handle;
+                        userGroups.Add(new UserGroup()
+                        {
+                            UserGroupHandle = userGroupHandle,
+                            UserGroupId = userGroupId
+                        });
                     }
                     else
                     {
@@ -124,7 +134,7 @@ namespace PlanningPoker.Controllers
                     };
                     request.Blocks = message.Blocks;
                     var response = await slackClient.Chat.Post(request);
-                    _pokerHandRepository.AddPokerHand(response.Timestamp.Identifier, userGroupIDs);
+                    _pokerHandRepository.AddPokerHand(response.Timestamp.Identifier, userGroups);
                 }
             }
 
