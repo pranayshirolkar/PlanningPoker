@@ -15,7 +15,9 @@ namespace PlanningPoker.Controllers
     public class PlanningPokerController : ControllerBase
     {
         private readonly IPokerHandRepository _pokerHandRepository;
-        private readonly ISlackApiClient slackClient = new SlackWebApiClient("");
+
+        private readonly ISlackApiClient slackClient =
+            new SlackWebApiClient("");
 
         public PlanningPokerController(IPokerHandRepository pokerHandRepository)
         {
@@ -50,14 +52,12 @@ namespace PlanningPoker.Controllers
             }
             else
             {
-                var wasVoteAdded = _pokerHandRepository.AddVote(p.Message.Timestamp.Identifier, p.User.ID,
+                _pokerHandRepository.AddVote(p.Message.Timestamp.Identifier, p.User.ID,
                     p.User.Username,
                     p.Actions.Single().Value);
-                if (wasVoteAdded)
-                {
-                    var responseMessage = MessageHelpers.GetMessageWithNewVoteAdded(p.Message.Blocks, p.User.Username);
-                    await responseMessage.Send(p.ResponseUrl);
-                }
+                var pokerHand = _pokerHandRepository.GetPokerHand(p.Message.Timestamp.Identifier);
+                var responseMessage = MessageHelpers.GetMessageWithNewVoteAdded(p.Message.Blocks, p.User.Username, pokerHand.Votes.Select(i => i.Value.Username).ToList());
+                await responseMessage.Send(p.ResponseUrl);
             }
 
             return Ok("interaction finished");

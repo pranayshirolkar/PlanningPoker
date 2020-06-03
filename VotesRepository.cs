@@ -6,7 +6,7 @@ namespace PlanningPoker
     {
         void AddPokerHand(string messageId, IList<UserGroup> userGroups);
 
-        bool AddVote(string messageId, string userId, string username, string value);
+        void AddVote(string messageId, string userId, string username, string value);
 
         PokerHand GetPokerHand(string messageId);
     }
@@ -53,7 +53,7 @@ namespace PlanningPoker
             };
         }
 
-        public bool AddVote(string messageId, string userId, string username, string value)
+        public void AddVote(string messageId, string userId, string username, string value)
         {
             var pokerHand = pokerHandsStore[messageId];
             if (pokerHand.Votes.ContainsKey(userId))
@@ -63,7 +63,6 @@ namespace PlanningPoker
                     Username = username,
                     Value = value
                 };
-                return false;
             }
 
             pokerHand.Votes[userId] = new Vote()
@@ -71,7 +70,6 @@ namespace PlanningPoker
                 Username = username,
                 Value = value
             };
-            return true;
         }
 
         public PokerHand GetPokerHand(string messageId)

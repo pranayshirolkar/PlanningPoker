@@ -11,16 +11,17 @@ namespace PlanningPoker
 {
     public static class MessageHelpers
     {
-        public static InteractionMessage CreateDealtMessage(string username, string dealItem, IList<UserGroup> userGroups)
+        public static InteractionMessage CreateDealtMessage(string username, string dealItem,
+            IList<UserGroup> userGroups)
         {
             var message = new InteractionMessage(ResponseType.InChannel);
             message.Blocks.Add(new Section()
             {
                 Text = new MarkdownText("@" + username + " dealt a hand. Please vote for *" + dealItem + "*." +
                                         (userGroups.Any()
-                                            ? Environment.NewLine + 
+                                            ? Environment.NewLine +
                                               "Groups: " + string.Join(", ",
-                                                userGroups.Select(g => "@" + g.UserGroupHandle))
+                                                  userGroups.Select(g => "@" + g.UserGroupHandle))
                                             : "")),
                 Accessory = new Button()
                 {
@@ -90,22 +91,15 @@ namespace PlanningPoker
             return message;
         }
 
-        public static InteractionMessage GetMessageWithNewVoteAdded(IList<IMessageBlock> blocks, string username)
+        public static InteractionMessage GetMessageWithNewVoteAdded(IList<IMessageBlock> blocks, string username,
+            IList<string> usersVoted)
         {
             var responseMessage = new InteractionMessage(true);
             responseMessage.Blocks = blocks;
-            var block = (Section) responseMessage.Blocks[^1];
-            if (block.Text.Text.Equals(Constants.NoVotesYet))
+            var block = new Section()
             {
-                block = new Section()
-                {
-                    Text = new MarkdownText("Voted: @" + username)
-                };
-            }
-            else
-            {
-                block.Text.Text += ", @" + username;
-            }
+                Text = new MarkdownText("Voted: " + string.Join(", ", usersVoted.Select(u => "@" + u)))
+            };
 
             responseMessage.Blocks[^1] = block;
             return responseMessage;
@@ -125,13 +119,12 @@ namespace PlanningPoker
                     sb.Append("Votes from @" + userGroup.UserGroupHandle + ":");
                     sb.Append(Environment.NewLine);
                     HandleOutput(results, userGroup.UserIds, sb);
-                }    
+                }
             }
             else
             {
                 HandleOutput(results, null, sb);
             }
-            
 
             var message = new InteractionMessage(replaceOriginal: true);
             message.Blocks = blocks;
@@ -152,15 +145,15 @@ namespace PlanningPoker
 
         private static void HandleOutput(IDictionary<string, Vote> results, IList<string> userGroup, StringBuilder sb)
         {
-            var grouped = (userGroup == null ? results : results.Where(r => userGroup.Contains(r.Key)))
-                .OrderBy(v => v.Value.Value)
-                .GroupBy(vote => vote.Value.Value);
-            foreach (var v in grouped)
+            var resultsGroupedByVoteValue = (userGroup == null ? results : results.Where(r => userGroup.Contains(r.Key)))
+                .OrderBy(result => result.Value.Value)
+                .GroupBy(result => result.Value.Value);
+            foreach (var resultGroup in resultsGroupedByVoteValue)
             {
-                sb.Append("```" + v.Key + ": ");
-                foreach (var g in v)
+                sb.Append("```" + resultGroup.Key + ": ");
+                foreach (var result in resultGroup)
                 {
-                    sb.Append("@" + g.Value.Username + ", ");
+                    sb.Append("@" + result.Value.Username + ", ");
                 }
 
                 sb.Remove(sb.Length - 2, 1);
