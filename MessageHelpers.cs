@@ -83,25 +83,20 @@ namespace PlanningPoker
         {
             var sb = new StringBuilder();
 
-            foreach (var userGroup in setOfGroups)
+            if (setOfGroups.Any())
             {
-                sb.Append("Group: ");
-                sb.Append(Environment.NewLine);
-                var grouped = results.Where(r => userGroup.Contains(r.Key))
-                    .OrderBy(v => v.Value.Value)
-                    .GroupBy(vote => vote.Value.Value);
-                foreach (var v in grouped)
+                foreach (var userGroup in setOfGroups)
                 {
-                    sb.Append(v.Key + ": ");
-                    foreach (var g in v)
-                    {
-                        sb.Append("@" + g.Value.Username + ", ");
-                    }
-
-                    sb.Remove(sb.Length - 2, 1);
+                    sb.Append("Group: ");
                     sb.Append(Environment.NewLine);
-                }
+                    HandleOutput(results, userGroup, sb);
+                }    
             }
+            else
+            {
+                HandleOutput(results, null, sb);
+            }
+            
 
             var message = new InteractionMessage(replaceOriginal: true);
             message.Blocks = blocks;
@@ -118,6 +113,24 @@ namespace PlanningPoker
                 Text = new MarkdownText(string.IsNullOrEmpty(sb.ToString()) ? "No one voted." : sb.ToString())
             };
             return message;
+        }
+
+        private static void HandleOutput(IDictionary<string, Vote> results, IList<string> userGroup, StringBuilder sb)
+        {
+            var grouped = (userGroup == null ? results : results.Where(r => userGroup.Contains(r.Key)))
+                .OrderBy(v => v.Value.Value)
+                .GroupBy(vote => vote.Value.Value);
+            foreach (var v in grouped)
+            {
+                sb.Append(v.Key + ": ");
+                foreach (var g in v)
+                {
+                    sb.Append("@" + g.Value.Username + ", ");
+                }
+
+                sb.Remove(sb.Length - 2, 1);
+                sb.Append(Environment.NewLine);
+            }
         }
 
         public static InteractionMessage CreateEphemeralMessage(string text)
