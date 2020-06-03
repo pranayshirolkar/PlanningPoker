@@ -44,6 +44,36 @@ namespace PlanningPoker
                     {
                         Text = "3",
                         Value = "3"
+                    },
+                    new Button()
+                    {
+                        Text = "5",
+                        Value = "5"
+                    },
+                    new Button()
+                    {
+                        Text = "8",
+                        Value = "8"
+                    },
+                    new Button()
+                    {
+                        Text = "13",
+                        Value = "13"
+                    },
+                    new Button()
+                    {
+                        Text = "21",
+                        Value = "21"
+                    },
+                    new Button()
+                    {
+                        Text = "34",
+                        Value = "34"
+                    },
+                    new Button()
+                    {
+                        Text = "?",
+                        Value = "?"
                     }
                 }
             });
