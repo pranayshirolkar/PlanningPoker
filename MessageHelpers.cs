@@ -11,12 +11,17 @@ namespace PlanningPoker
 {
     public static class MessageHelpers
     {
-        public static InteractionMessage CreateDealtMessage(string username, string dealItem)
+        public static InteractionMessage CreateDealtMessage(string username, string dealItem, IList<UserGroup> userGroups)
         {
             var message = new InteractionMessage(ResponseType.InChannel);
             message.Blocks.Add(new Section()
             {
-                Text = new MarkdownText("@" + username + " dealt " + dealItem),
+                Text = new MarkdownText("@" + username + " dealt a hand. Please vote for *" + dealItem + "*." +
+                                        (userGroups.Any()
+                                            ? Environment.NewLine + 
+                                              "Groups: " + string.Join(", ",
+                                                userGroups.Select(g => "@" + g.UserGroupHandle))
+                                            : "")),
                 Accessory = new Button()
                 {
                     Text = "Close and Reveal votes",

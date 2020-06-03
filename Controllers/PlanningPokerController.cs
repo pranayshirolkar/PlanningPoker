@@ -127,7 +127,7 @@ namespace PlanningPoker.Controllers
                 }
                 else
                 {
-                    var message = MessageHelpers.CreateDealtMessage(slashCommand.Username, whatToDeal);
+                    var message = MessageHelpers.CreateDealtMessage(slashCommand.Username, whatToDeal, userGroups);
                     var request = new PostMessageRequest
                     {
                         Channel = slashCommand.ChannelId
