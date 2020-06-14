@@ -62,6 +62,13 @@ namespace PlanningPoker.Controllers
 
             return Ok("interaction finished");
         }
+        
+        [Route("[action]")]
+        [HttpGet]
+        public async Task<IActionResult> Hello()
+        {
+            return Ok("Hello from Planning Poker App!");
+        }
 
         [Route("[action]")]
         [HttpPost]
