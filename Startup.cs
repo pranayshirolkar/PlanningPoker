@@ -32,6 +32,7 @@ namespace PlanningPoker
             services.AddSingleton<IPokerHandRepository, PokerHandRepository>();
             services.AddTransient<ITokenReader, TokenReader>();
             services.AddTransient<ISlackApiFactory, SlackApiFactory>();
+            services.AddTransient<IPokerHandService, PokerHandService>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
