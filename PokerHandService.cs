@@ -36,6 +36,19 @@ namespace PlanningPoker
                 var x = 0;
                 while (x < arguments.Length)
                 {
+                    if (Regex.Match(arguments[x], "--same").Success)
+                    {
+                        if (pokerHandRepository.TryRetrieveSameUserGroups(new UserAndChannel
+                            {
+                                ChannelId = slashCommand.ChannelId,
+                                UserId = slashCommand.UserId
+                            },
+                            out var retrievedUserGroups))
+                        {
+                            userGroups.AddRange(retrievedUserGroups);
+                        }
+                    }
+
                     if (Regex.Match(arguments[x], @"<@U.*>").Success)
                     {
                         var m = MessageHelpers.CreateEphemeralMessage(
@@ -101,6 +114,11 @@ namespace PlanningPoker
                     }
 
                     pokerHandRepository.AddPokerHand(response.Timestamp.Identifier, userGroups);
+                    pokerHandRepository.RememberUserGroups(new UserAndChannel
+                    {
+                        ChannelId = slashCommand.ChannelId,
+                        UserId = slashCommand.UserId
+                    }, userGroups);
                 }
             }
         }

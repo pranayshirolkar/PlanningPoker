@@ -11,39 +11,22 @@ namespace PlanningPoker
         PokerHand GetPokerHand(string messageId);
 
         void DeleteHand(string messageId);
-    }
 
-    public class Vote
-    {
-        public string Username { get; set; }
-        public string Value { get; set; }
-    }
-
-    public class PokerHand
-    {
-        public IDictionary<string, Vote> Votes { get; set; }
-        public IList<UserGroup> UserGroups { get; set; }
-    }
-
-    public class UserGroupWithUsers
-    {
-        public string UserGroupHandle { get; set; }
-        public IList<string> UserIds { get; set; }
-    }
-
-    public class UserGroup
-    {
-        public string UserGroupId { get; set; }
-        public string UserGroupHandle { get; set; }
+        void RememberUserGroups(UserAndChannel userAndChannel, IList<UserGroup> userGroups);
+        
+        bool TryRetrieveSameUserGroups(UserAndChannel userAndChannel, out IList<UserGroup> userGroups);
     }
 
     public class PokerHandRepository : IPokerHandRepository
     {
-        private IDictionary<string, PokerHand> pokerHandsStore;
+        private readonly IDictionary<string, PokerHand> pokerHandsStore;
+
+        private readonly IDictionary<UserAndChannel, IList<UserGroup>> rememberedUserGroups;
 
         public PokerHandRepository()
         {
-            this.pokerHandsStore = new Dictionary<string, PokerHand>();
+            pokerHandsStore = new Dictionary<string, PokerHand>();
+            rememberedUserGroups = new Dictionary<UserAndChannel, IList<UserGroup>>();
         }
 
         public void AddPokerHand(string messageId, IList<UserGroup> userGroups)
@@ -58,15 +41,6 @@ namespace PlanningPoker
         public void AddVote(string messageId, string userId, string username, string value)
         {
             var pokerHand = pokerHandsStore[messageId];
-            if (pokerHand.Votes.ContainsKey(userId))
-            {
-                pokerHand.Votes[userId] = new Vote()
-                {
-                    Username = username,
-                    Value = value
-                };
-            }
-
             pokerHand.Votes[userId] = new Vote()
             {
                 Username = username,
@@ -82,6 +56,16 @@ namespace PlanningPoker
         public void DeleteHand(string messageId)
         {
             pokerHandsStore.Remove(messageId);
+        }
+
+        public void RememberUserGroups(UserAndChannel userAndChannel, IList<UserGroup> userGroups)
+        {
+            rememberedUserGroups[userAndChannel] = userGroups;
+        }
+
+        public bool TryRetrieveSameUserGroups(UserAndChannel userAndChannel, out IList<UserGroup> userGroups)
+        {
+            return rememberedUserGroups.TryGetValue(userAndChannel, out userGroups);
         }
     }
 }
