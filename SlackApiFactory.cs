@@ -6,17 +6,17 @@ namespace PlanningPoker
     }
     public class SlackApiFactory : ISlackApiFactory
     {
-        private readonly ITokenReader _tokenReader;
+        private readonly ITokenReader tokenReader;
 
         public ISlackApi CreateForTeamId(string teamId)
         {
-            var token = _tokenReader.GetToken(teamId);
+            var token = tokenReader.GetToken(teamId);
             return new SlackApi(token);
         }
 
         public SlackApiFactory(ITokenReader tokenReader)
         {
-            _tokenReader = tokenReader;
+            this.tokenReader = tokenReader;
         }
     }
 }

@@ -7,18 +7,18 @@ namespace PlanningPoker.Controllers
     [Route("[controller]")]
     public class PlanningPokerController : ControllerBase
     {
-        private readonly IPokerHandService _pokerHandService;
+        private readonly IPokerHandService pokerHandService;
 
         public PlanningPokerController(IPokerHandService pokerHandService)
         {
-            _pokerHandService = pokerHandService;
+            this.pokerHandService = pokerHandService;
         }
 
         [Route("[action]")]
         [HttpPost]
         public async Task<IActionResult> PokerInteract([FromForm] string payload)
         {
-            await _pokerHandService.HandleInteractionAsync(payload);
+            await pokerHandService.HandleInteractionAsync(payload);
             return Ok("interaction finished");
         }
 
@@ -43,7 +43,7 @@ namespace PlanningPoker.Controllers
 
             var payload = string.Join('&', dataset);
 
-            await _pokerHandService.HandleSlashCommandAsync(payload);
+            await pokerHandService.HandleSlashCommandAsync(payload);
 
             return Ok();
         }

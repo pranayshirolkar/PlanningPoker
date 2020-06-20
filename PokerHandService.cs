@@ -16,8 +16,8 @@ namespace PlanningPoker
 
     public class PokerHandService : IPokerHandService
     {
-        private readonly IPokerHandRepository _pokerHandRepository;
-        private readonly ISlackApiFactory _slackApiFactory;
+        private readonly IPokerHandRepository pokerHandRepository;
+        private readonly ISlackApiFactory slackApiFactory;
 
         public async Task HandleSlashCommandAsync(string payload)
         {
@@ -46,7 +46,7 @@ namespace PlanningPoker
                     if (Regex.Match(arguments[x], @"<!subteam\^.*>").Success)
                     {
                         var userGroupId = arguments[x].Substring(10).Split('|')[0];
-                        var userGroupHandle = await _slackApiFactory.CreateForTeamId(slashCommand.TeamId)
+                        var userGroupHandle = await slackApiFactory.CreateForTeamId(slashCommand.TeamId)
                             .GetUserGroupHandleByUserGroupIdAsync(userGroupId);
                         userGroups.Add(new UserGroup()
                         {
@@ -78,9 +78,29 @@ namespace PlanningPoker
                         Channel = slashCommand.ChannelId,
                         Blocks = message.Blocks
                     };
-                    var messageIdentifier = await _slackApiFactory.CreateForTeamId(slashCommand.TeamId)
+                    var response = await slackApiFactory.CreateForTeamId(slashCommand.TeamId)
                         .SendMessageAsync(request);
-                    _pokerHandRepository.AddPokerHand(messageIdentifier, userGroups);
+                    if (!response.OK)
+                    {
+                        if (response.Error.Equals("channel_not_found"))
+                        {
+                            await MessageHelpers
+                                .CreateEphemeralMessage(
+                                    "Please invite @planningpoker if this is a private channel.\n" +
+                                    "This command is only useful (and supported) in groups and channels.\n" +
+                                    "_Not supported in Direct Messages._")
+                                .Send(slashCommand.ResponseUrl);
+                        }
+                        else
+                        {
+                            await MessageHelpers.CreateEphemeralMessage("Unexpected error occured, sorry!")
+                                .Send(slashCommand.ResponseUrl);
+                        }
+
+                        return;
+                    }
+
+                    pokerHandRepository.AddPokerHand(response.Timestamp.Identifier, userGroups);
                 }
             }
         }
@@ -91,11 +111,11 @@ namespace PlanningPoker
 
             if (p.Actions.Single().Value == Constants.CloseVote)
             {
-                var pokerHand = _pokerHandRepository.GetPokerHand(p.Message.Timestamp.Identifier);
+                var pokerHand = pokerHandRepository.GetPokerHand(p.Message.Timestamp.Identifier);
                 var setOfGroups = new List<UserGroupWithUsers>();
                 foreach (var g in pokerHand.UserGroups)
                 {
-                    var userIds = await _slackApiFactory.CreateForTeamId(p.Team.ID)
+                    var userIds = await slackApiFactory.CreateForTeamId(p.Team.ID)
                         .GetUserIdsByUserGroupIdAsync(g.UserGroupId);
                     setOfGroups.Add(new UserGroupWithUsers()
                     {
@@ -111,10 +131,10 @@ namespace PlanningPoker
             }
             else
             {
-                _pokerHandRepository.AddVote(p.Message.Timestamp.Identifier, p.User.ID,
+                pokerHandRepository.AddVote(p.Message.Timestamp.Identifier, p.User.ID,
                     p.User.Username,
                     p.Actions.Single().Value);
-                var pokerHand = _pokerHandRepository.GetPokerHand(p.Message.Timestamp.Identifier);
+                var pokerHand = pokerHandRepository.GetPokerHand(p.Message.Timestamp.Identifier);
                 var responseMessage = MessageHelpers.GetMessageWithNewVoteAdded(p.Message.Blocks,
                     pokerHand.Votes.Select(i => i.Value.Username).ToList());
                 await responseMessage.Send(p.ResponseUrl);
@@ -123,8 +143,8 @@ namespace PlanningPoker
 
         public PokerHandService(IPokerHandRepository pokerHandRepository, ISlackApiFactory slackApiFactory)
         {
-            _pokerHandRepository = pokerHandRepository;
-            _slackApiFactory = slackApiFactory;
+            this.pokerHandRepository = pokerHandRepository;
+            this.slackApiFactory = slackApiFactory;
         }
     }
 }

@@ -8,43 +8,35 @@ namespace PlanningPoker
     public interface ISlackApi
     {
         Task<string> GetUserGroupHandleByUserGroupIdAsync(string userGroupId);
-        Task<string> SendMessageAsync(PostMessageRequest postMessageRequest);
+        Task<PostMessageResponse> SendMessageAsync(PostMessageRequest postMessageRequest);
         Task<string[]> GetUserIdsByUserGroupIdAsync(string userGroupId);
     }
 
     public class SlackApi : ISlackApi
     {
-        private readonly string _token;
+        private readonly string token;
+        private SlackWebApiClient SlackClient => new SlackWebApiClient(token);
 
         public SlackApi(string token)
         {
-            _token = token;
+            this.token = token;
         }
 
         public async Task<string> GetUserGroupHandleByUserGroupIdAsync(string userGroupId)
         {
-            var slackClient = GetSlackClient();
-            var userGroups = await slackClient.Usergroups.List();
+            var userGroups = await SlackClient.Usergroups.List();
             return userGroups.Usergroups.Single(ug => ug.ID.Equals(userGroupId)).Handle;
         }
 
-        public async Task<string> SendMessageAsync(PostMessageRequest postMessageRequest)
+        public async Task<PostMessageResponse> SendMessageAsync(PostMessageRequest postMessageRequest)
         {
-            var slackClient = GetSlackClient();
-            var response = await slackClient.Chat.Post(postMessageRequest);
-            return response.Timestamp.Identifier;
+            return await SlackClient.Chat.Post(postMessageRequest);
         }
 
         public async Task<string[]> GetUserIdsByUserGroupIdAsync(string userGroupId)
         {
-            var slackClient = GetSlackClient();
-            var response = await slackClient.Usergroups.Users.List(userGroupId);
+            var response = await SlackClient.Usergroups.Users.List(userGroupId);
             return response.Users;
-        }
-
-        private SlackWebApiClient GetSlackClient()
-        {
-            return new SlackWebApiClient(_token);
         }
     }
 }
