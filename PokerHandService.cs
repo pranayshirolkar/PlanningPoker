@@ -128,6 +128,7 @@ namespace PlanningPoker
                     MessageHelpers.GetMessageWithVotesClosed(p.Message.Blocks, setOfGroups, pokerHand.Votes,
                         p.User.Username);
                 await message.Send(p.ResponseUrl);
+                pokerHandRepository.DeleteHand(p.Message.Timestamp.Identifier);
             }
             else
             {

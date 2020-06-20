@@ -9,6 +9,8 @@ namespace PlanningPoker
         void AddVote(string messageId, string userId, string username, string value);
 
         PokerHand GetPokerHand(string messageId);
+
+        void DeleteHand(string messageId);
     }
 
     public class Vote
@@ -75,6 +77,11 @@ namespace PlanningPoker
         public PokerHand GetPokerHand(string messageId)
         {
             return pokerHandsStore[messageId];
+        }
+
+        public void DeleteHand(string messageId)
+        {
+            pokerHandsStore.Remove(messageId);
         }
     }
 }
