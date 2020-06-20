@@ -4,7 +4,6 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
-using Slack.NetStandard;
 using Slack.NetStandard.Interaction;
 using Slack.NetStandard.WebApi.Chat;
 
@@ -15,13 +14,12 @@ namespace PlanningPoker.Controllers
     public class PlanningPokerController : ControllerBase
     {
         private readonly IPokerHandRepository _pokerHandRepository;
+        private readonly ISlackApi _slackApi;
 
-        private readonly ISlackApiClient slackClient =
-            new SlackWebApiClient("");
-
-        public PlanningPokerController(IPokerHandRepository pokerHandRepository)
+        public PlanningPokerController(IPokerHandRepository pokerHandRepository, ISlackApi slackApi)
         {
-            this._pokerHandRepository = pokerHandRepository;
+            _pokerHandRepository = pokerHandRepository;
+            _slackApi = slackApi;
         }
 
         [Route("[action]")]
@@ -36,11 +34,10 @@ namespace PlanningPoker.Controllers
                 var setOfGroups = new List<UserGroupWithUsers>();
                 foreach (var g in pokerHand.UserGroups)
                 {
-                    var group = await slackClient.Usergroups.Users.List(g.UserGroupId);
-                    var newGroupList = group.Users;
+                    var userIds = await _slackApi.GetUserIdsByUserGroupIdAsync(g.UserGroupId);
                     setOfGroups.Add(new UserGroupWithUsers()
                     {
-                        UserIds = newGroupList,
+                        UserIds = userIds,
                         UserGroupHandle = g.UserGroupHandle
                     });
                 }
@@ -56,7 +53,7 @@ namespace PlanningPoker.Controllers
                     p.User.Username,
                     p.Actions.Single().Value);
                 var pokerHand = _pokerHandRepository.GetPokerHand(p.Message.Timestamp.Identifier);
-                var responseMessage = MessageHelpers.GetMessageWithNewVoteAdded(p.Message.Blocks, p.User.Username, pokerHand.Votes.Select(i => i.Value.Username).ToList());
+                var responseMessage = MessageHelpers.GetMessageWithNewVoteAdded(p.Message.Blocks, pokerHand.Votes.Select(i => i.Value.Username).ToList());
                 await responseMessage.Send(p.ResponseUrl);
             }
 
@@ -94,7 +91,6 @@ namespace PlanningPoker.Controllers
             }
             else
             {
-                var allUserGroups = await slackClient.Usergroups.List();
                 var userGroups = new List<UserGroup>();
                 var x = 0;
                 while (x < arguments.Length)
@@ -109,7 +105,7 @@ namespace PlanningPoker.Controllers
                     if (Regex.Match(arguments[x], @"<!subteam\^.*>").Success)
                     {
                         var userGroupId = arguments[x].Substring(10).Split('|')[0];
-                        var userGroupHandle = allUserGroups.Usergroups.Single(g => g.ID.Equals(userGroupId)).Handle;
+                        var userGroupHandle = await _slackApi.GetUserGroupHandleByUserGroupIdAsync(userGroupId);
                         userGroups.Add(new UserGroup()
                         {
                             UserGroupHandle = userGroupHandle,
@@ -137,11 +133,12 @@ namespace PlanningPoker.Controllers
                     var message = MessageHelpers.CreateDealtMessage(slashCommand.Username, whatToDeal, userGroups);
                     var request = new PostMessageRequest
                     {
-                        Channel = slashCommand.ChannelId
+                        Channel = slashCommand.ChannelId,
+                        Blocks = message.Blocks
+                        
                     };
-                    request.Blocks = message.Blocks;
-                    var response = await slackClient.Chat.Post(request);
-                    _pokerHandRepository.AddPokerHand(response.Timestamp.Identifier, userGroups);
+                    var messageIdentifier = await _slackApi.SendMessageAsync(request);
+                    _pokerHandRepository.AddPokerHand(messageIdentifier, userGroups);
                 }
             }
 

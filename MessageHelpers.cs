@@ -91,7 +91,7 @@ namespace PlanningPoker
             return message;
         }
 
-        public static InteractionMessage GetMessageWithNewVoteAdded(IList<IMessageBlock> blocks, string username,
+        public static InteractionMessage GetMessageWithNewVoteAdded(IList<IMessageBlock> blocks,
             IList<string> usersVoted)
         {
             var responseMessage = new InteractionMessage(true);
