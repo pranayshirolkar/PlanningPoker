@@ -14,12 +14,12 @@ namespace PlanningPoker.Controllers
     public class PlanningPokerController : ControllerBase
     {
         private readonly IPokerHandRepository _pokerHandRepository;
-        private readonly ISlackApi _slackApi;
+        private readonly ISlackApiFactory _slackApiFactory;
 
-        public PlanningPokerController(IPokerHandRepository pokerHandRepository, ISlackApi slackApi)
+        public PlanningPokerController(IPokerHandRepository pokerHandRepository, ISlackApiFactory slackApiFactory)
         {
             _pokerHandRepository = pokerHandRepository;
-            _slackApi = slackApi;
+            _slackApiFactory = slackApiFactory;
         }
 
         [Route("[action]")]
@@ -34,7 +34,8 @@ namespace PlanningPoker.Controllers
                 var setOfGroups = new List<UserGroupWithUsers>();
                 foreach (var g in pokerHand.UserGroups)
                 {
-                    var userIds = await _slackApi.GetUserIdsByUserGroupIdAsync(g.UserGroupId);
+                    var userIds = await _slackApiFactory.CreateForTeamId(p.Team.ID)
+                        .GetUserIdsByUserGroupIdAsync(g.UserGroupId);
                     setOfGroups.Add(new UserGroupWithUsers()
                     {
                         UserIds = userIds,
@@ -53,13 +54,14 @@ namespace PlanningPoker.Controllers
                     p.User.Username,
                     p.Actions.Single().Value);
                 var pokerHand = _pokerHandRepository.GetPokerHand(p.Message.Timestamp.Identifier);
-                var responseMessage = MessageHelpers.GetMessageWithNewVoteAdded(p.Message.Blocks, pokerHand.Votes.Select(i => i.Value.Username).ToList());
+                var responseMessage = MessageHelpers.GetMessageWithNewVoteAdded(p.Message.Blocks,
+                    pokerHand.Votes.Select(i => i.Value.Username).ToList());
                 await responseMessage.Send(p.ResponseUrl);
             }
 
             return Ok("interaction finished");
         }
-        
+
         [Route("[action]")]
         [HttpGet]
         public IActionResult Hello()
@@ -105,7 +107,8 @@ namespace PlanningPoker.Controllers
                     if (Regex.Match(arguments[x], @"<!subteam\^.*>").Success)
                     {
                         var userGroupId = arguments[x].Substring(10).Split('|')[0];
-                        var userGroupHandle = await _slackApi.GetUserGroupHandleByUserGroupIdAsync(userGroupId);
+                        var userGroupHandle = await _slackApiFactory.CreateForTeamId(slashCommand.TeamId)
+                            .GetUserGroupHandleByUserGroupIdAsync(userGroupId);
                         userGroups.Add(new UserGroup()
                         {
                             UserGroupHandle = userGroupHandle,
@@ -135,9 +138,9 @@ namespace PlanningPoker.Controllers
                     {
                         Channel = slashCommand.ChannelId,
                         Blocks = message.Blocks
-                        
                     };
-                    var messageIdentifier = await _slackApi.SendMessageAsync(request);
+                    var messageIdentifier = await _slackApiFactory.CreateForTeamId(slashCommand.TeamId)
+                        .SendMessageAsync(request);
                     _pokerHandRepository.AddPokerHand(messageIdentifier, userGroups);
                 }
             }

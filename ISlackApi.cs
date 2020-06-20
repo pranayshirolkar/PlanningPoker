@@ -14,6 +14,13 @@ namespace PlanningPoker
 
     public class SlackApi : ISlackApi
     {
+        private readonly string _token;
+
+        public SlackApi(string token)
+        {
+            _token = token;
+        }
+
         public async Task<string> GetUserGroupHandleByUserGroupIdAsync(string userGroupId)
         {
             var slackClient = GetSlackClient();
@@ -35,9 +42,9 @@ namespace PlanningPoker
             return response.Users;
         }
 
-        private static SlackWebApiClient GetSlackClient()
+        private SlackWebApiClient GetSlackClient()
         {
-            return new SlackWebApiClient("");
+            return new SlackWebApiClient(_token);
         }
     }
 }
