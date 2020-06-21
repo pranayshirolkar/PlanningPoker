@@ -32,23 +32,21 @@ namespace PlanningPoker
             }
             else
             {
+                if (arguments[0] == "help")
+                {
+                    var m = MessageHelpers.CreateEphemeralMessage(
+                        "To deal in a channel or group, type `/poker [what]`\n" +
+                        "To get grouped results, add user groups: `/poker [@group1] [@group2] [what]`\n" +
+                        "To use the same groups in that channel subsequently: `/poker --same [what]`");
+                    await m.Send(slashCommand.ResponseUrl);
+
+                    return;
+                }
+
                 var userGroups = new List<UserGroup>();
                 var x = 0;
                 while (x < arguments.Length)
                 {
-                    if (Regex.Match(arguments[x], "--same").Success)
-                    {
-                        if (pokerHandRepository.TryRetrieveSameUserGroups(new UserAndChannel
-                            {
-                                ChannelId = slashCommand.ChannelId,
-                                UserId = slashCommand.UserId
-                            },
-                            out var retrievedUserGroups))
-                        {
-                            userGroups.AddRange(retrievedUserGroups);
-                        }
-                    }
-
                     if (Regex.Match(arguments[x], @"<@U.*>").Success)
                     {
                         var m = MessageHelpers.CreateEphemeralMessage(
@@ -56,16 +54,39 @@ namespace PlanningPoker
                         await m.Send(slashCommand.ResponseUrl);
                     }
 
-                    if (Regex.Match(arguments[x], @"<!subteam\^.*>").Success)
+                    if (Regex.Match(arguments[x], @"<!subteam\^.*>|--same").Success)
                     {
-                        var userGroupId = arguments[x].Substring(10).Split('|')[0];
-                        var userGroupHandle = await slackApiFactory.CreateForTeamId(slashCommand.TeamId)
-                            .GetUserGroupHandleByUserGroupIdAsync(userGroupId);
-                        userGroups.Add(new UserGroup()
+                        if (arguments[x].Equals("--same"))
                         {
-                            UserGroupHandle = userGroupHandle,
-                            UserGroupId = userGroupId
-                        });
+                            if (pokerHandRepository.TryRetrieveSameUserGroups(new UserAndChannel
+                                {
+                                    ChannelId = slashCommand.ChannelId,
+                                    UserId = slashCommand.UserId
+                                },
+                                out var retrievedUserGroups))
+                            {
+                                userGroups.AddRange(retrievedUserGroups);
+                            }
+                            else
+                            {
+                                var cannotRememberMessage = MessageHelpers.CreateEphemeralMessage(
+                                    "I'm sorry I can't remember `--same`.\n" +
+                                    "Please use the full command once for me to remember next time it in this channel.");
+                                await cannotRememberMessage.Send(slashCommand.ResponseUrl);
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            var userGroupId = arguments[x].Substring(10).Split('|')[0];
+                            var userGroupHandle = await slackApiFactory.CreateForTeamId(slashCommand.TeamId)
+                                .GetUserGroupHandleByUserGroupIdAsync(userGroupId);
+                            userGroups.Add(new UserGroup()
+                            {
+                                UserGroupHandle = userGroupHandle,
+                                UserGroupId = userGroupId
+                            });
+                        }
                     }
                     else
                     {
