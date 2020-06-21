@@ -135,11 +135,14 @@ namespace PlanningPoker
                     }
 
                     pokerHandRepository.AddPokerHand(response.Timestamp.Identifier, userGroups);
-                    pokerHandRepository.RememberUserGroups(new UserAndChannel
+                    if (userGroups.Any())
                     {
-                        ChannelId = slashCommand.ChannelId,
-                        UserId = slashCommand.UserId
-                    }, userGroups);
+                        pokerHandRepository.RememberUserGroups(new UserAndChannel
+                        {
+                            ChannelId = slashCommand.ChannelId,
+                            UserId = slashCommand.UserId
+                        }, userGroups);
+                    }
                 }
             }
         }
