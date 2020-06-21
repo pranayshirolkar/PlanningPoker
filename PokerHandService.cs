@@ -70,7 +70,7 @@ namespace PlanningPoker
                             else
                             {
                                 var cannotRememberMessage = MessageHelpers.CreateEphemeralMessage(
-                                    "I'm sorry I can't remember `--same`.\n" +
+                                    "I'm sorry I can't remember `--same` groups.\n" +
                                     "Please use the command with groups once: `/poker [@group1] [@group2] [what]`.\n" +
                                     "Subsequently, to use the same ones next time in this channel, use `/poker --same [what]`.\n" +
                                     "");
