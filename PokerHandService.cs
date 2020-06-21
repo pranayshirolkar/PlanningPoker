@@ -177,6 +177,10 @@ namespace PlanningPoker
 
         private bool EveryoneInGroupsHasVoted(PokerHand pokerHand)
         {
+            if (!pokerHand.UserGroups.Any())
+            {
+                return false;
+            }
             var allUserIdsFromGroups = pokerHand.UserGroups.SelectMany(ug => ug.UserIds);
             var userIdsVoted = pokerHand.Votes.Keys;
             return !allUserIdsFromGroups.Except(userIdsVoted).Any();
