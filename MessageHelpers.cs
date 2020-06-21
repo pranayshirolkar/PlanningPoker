@@ -98,7 +98,8 @@ namespace PlanningPoker
             responseMessage.Blocks = blocks;
             var block = new Section()
             {
-                Text = new MarkdownText("Voted: " + string.Join(", ", usersVoted.Select(u => "@" + u)))
+                Text = new MarkdownText(usersVoted.Count + " Voted: " +
+                                        string.Join(", ", usersVoted.Select(u => "@" + u)))
             };
 
             responseMessage.Blocks[^1] = block;
@@ -134,7 +135,11 @@ namespace PlanningPoker
             };
             message.Blocks[^3] = new Section()
             {
-                Text = new MarkdownText("Vote closed by @" + username)
+                Text = new MarkdownText("Got " + results.Count + " Votes." + " Closed by @" + username + " on " +
+                                        "<!date^" +
+                                        DateTime.UtcNow.Subtract(DateTime.UnixEpoch).TotalSeconds.ToString().Split('.')[
+                                            0] +
+                                        "^{date_short} at {time}|unknown date time>")
             };
             message.Blocks[^1] = new Section()
             {
@@ -145,7 +150,8 @@ namespace PlanningPoker
 
         private static void HandleOutput(IDictionary<string, Vote> results, IList<string> userGroup, StringBuilder sb)
         {
-            var resultsGroupedByVoteValue = (userGroup == null ? results : results.Where(r => userGroup.Contains(r.Key)))
+            var resultsGroupedByVoteValue =
+                (userGroup == null ? results : results.Where(r => userGroup.Contains(r.Key)))
                 .OrderBy(result => result.Value.Value)
                 .GroupBy(result => result.Value.Value);
             foreach (var resultGroup in resultsGroupedByVoteValue)

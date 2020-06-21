@@ -71,7 +71,9 @@ namespace PlanningPoker
                             {
                                 var cannotRememberMessage = MessageHelpers.CreateEphemeralMessage(
                                     "I'm sorry I can't remember `--same`.\n" +
-                                    "Please use the full command once for me to remember next time it in this channel.");
+                                    "Please use the command with groups once: `/poker [@group1] [@group2] [what]`.\n" +
+                                    "Subsequently, to use the same ones next time in this channel, use `/poker --same [what]`.\n" +
+                                    "");
                                 await cannotRememberMessage.Send(slashCommand.ResponseUrl);
                                 return;
                             }
@@ -134,7 +136,7 @@ namespace PlanningPoker
                         return;
                     }
 
-                    pokerHandRepository.AddPokerHand(response.Timestamp.Identifier, userGroups);
+                    pokerHandRepository.AddPokerHand(response.Timestamp.ToString(), userGroups);
                     if (userGroups.Any())
                     {
                         pokerHandRepository.RememberUserGroups(new UserAndChannel
@@ -153,7 +155,7 @@ namespace PlanningPoker
 
             if (p.Actions.Single().Value == Constants.CloseVote)
             {
-                var pokerHand = pokerHandRepository.GetPokerHand(p.Message.Timestamp.Identifier);
+                var pokerHand = pokerHandRepository.GetPokerHand(p.Message.Timestamp.ToString());
                 var setOfGroups = new List<UserGroupWithUsers>();
                 foreach (var g in pokerHand.UserGroups)
                 {
@@ -170,14 +172,14 @@ namespace PlanningPoker
                     MessageHelpers.GetMessageWithVotesClosed(p.Message.Blocks, setOfGroups, pokerHand.Votes,
                         p.User.Username);
                 await message.Send(p.ResponseUrl);
-                pokerHandRepository.DeleteHand(p.Message.Timestamp.Identifier);
+                pokerHandRepository.DeleteHand(p.Message.Timestamp.ToString());
             }
             else
             {
-                pokerHandRepository.AddVote(p.Message.Timestamp.Identifier, p.User.ID,
+                pokerHandRepository.AddVote(p.Message.Timestamp.ToString(), p.User.ID,
                     p.User.Username,
                     p.Actions.Single().Value);
-                var pokerHand = pokerHandRepository.GetPokerHand(p.Message.Timestamp.Identifier);
+                var pokerHand = pokerHandRepository.GetPokerHand(p.Message.Timestamp.ToString());
                 var responseMessage = MessageHelpers.GetMessageWithNewVoteAdded(p.Message.Blocks,
                     pokerHand.Votes.Select(i => i.Value.Username).ToList());
                 await responseMessage.Send(p.ResponseUrl);
