@@ -81,12 +81,14 @@ namespace PlanningPoker
                         else
                         {
                             var userGroupId = arguments[x].Substring(10).Split('|')[0];
-                            var userGroupHandle = await slackApiFactory.CreateForTeamId(slashCommand.TeamId)
-                                .GetUserGroupHandleByUserGroupIdAsync(userGroupId);
+                            var slackApi = slackApiFactory.CreateForTeamId(slashCommand.TeamId);
+                            var userGroupHandle = await slackApi.GetUserGroupHandleByUserGroupIdAsync(userGroupId);
+                            var userIds = await slackApi.GetUserIdsByUserGroupIdAsync(userGroupId);
                             userGroups.Add(new UserGroup()
                             {
                                 UserGroupHandle = userGroupHandle,
-                                UserGroupId = userGroupId
+                                UserGroupId = userGroupId,
+                                UserIds = userIds
                             });
                         }
                     }
@@ -124,7 +126,7 @@ namespace PlanningPoker
                                 .CreateEphemeralMessage(
                                     "Please invite @planningpoker if this is a private channel.\n" +
                                     "This command is only useful (and supported) in groups and channels.\n" +
-                                    "_Not supported in Direct Messages._")
+                                    "_(Not supported in Direct Messages.)_")
                                 .Send(slashCommand.ResponseUrl);
                         }
                         else
@@ -155,24 +157,7 @@ namespace PlanningPoker
 
             if (p.Actions.Single().Value == Constants.CloseVote)
             {
-                var pokerHand = pokerHandRepository.GetPokerHand(p.Message.Timestamp.ToString());
-                var setOfGroups = new List<UserGroupWithUsers>();
-                foreach (var g in pokerHand.UserGroups)
-                {
-                    var userIds = await slackApiFactory.CreateForTeamId(p.Team.ID)
-                        .GetUserIdsByUserGroupIdAsync(g.UserGroupId);
-                    setOfGroups.Add(new UserGroupWithUsers()
-                    {
-                        UserIds = userIds,
-                        UserGroupHandle = g.UserGroupHandle
-                    });
-                }
-
-                var message =
-                    MessageHelpers.GetMessageWithVotesClosed(p.Message.Blocks, setOfGroups, pokerHand.Votes,
-                        p.User.Username);
-                await message.Send(p.ResponseUrl);
-                pokerHandRepository.DeleteHand(p.Message.Timestamp.ToString());
+                await CloseVoteAsync(p, p.User.Username);
             }
             else
             {
@@ -183,7 +168,38 @@ namespace PlanningPoker
                 var responseMessage = MessageHelpers.GetMessageWithNewVoteAdded(p.Message.Blocks,
                     pokerHand.Votes.Select(i => i.Value.Username).ToList());
                 await responseMessage.Send(p.ResponseUrl);
+                if (EveryoneInGroupsHasVoted(pokerHand))
+                {
+                    await CloseVoteAsync(p, "planningpoker");
+                }
             }
+        }
+
+        private bool EveryoneInGroupsHasVoted(PokerHand pokerHand)
+        {
+            var allUserIdsFromGroups = pokerHand.UserGroups.SelectMany(ug => ug.UserIds);
+            var userIdsVoted = pokerHand.Votes.Keys;
+            return !allUserIdsFromGroups.Except(userIdsVoted).Any();
+        }
+
+        private async Task CloseVoteAsync(BlockActionsPayload p, string username)
+        {
+            var pokerHand = pokerHandRepository.GetPokerHand(p.Message.Timestamp.ToString());
+            var setOfGroups = new List<UserGroupWithUsers>();
+            foreach (var g in pokerHand.UserGroups)
+            {
+                setOfGroups.Add(new UserGroupWithUsers()
+                {
+                    UserIds = g.UserIds,
+                    UserGroupHandle = g.UserGroupHandle
+                });
+            }
+
+            var message =
+                MessageHelpers.GetMessageWithVotesClosed(p.Message.Blocks, setOfGroups, pokerHand.Votes,
+                    username);
+            await message.Send(p.ResponseUrl);
+            pokerHandRepository.DeleteHand(p.Message.Timestamp.ToString());
         }
 
         public PokerHandService(IPokerHandRepository pokerHandRepository, ISlackApiFactory slackApiFactory)

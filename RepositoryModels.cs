@@ -24,6 +24,7 @@ namespace PlanningPoker
     {
         public string UserGroupId { get; set; }
         public string UserGroupHandle { get; set; }
+        public string[] UserIds { get; set; }
     }
 
     public class UserAndChannel
