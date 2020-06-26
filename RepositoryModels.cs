@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace PlanningPoker
@@ -32,16 +33,22 @@ namespace PlanningPoker
         public string UserId { get; set; }
         public string ChannelId { get; set; }
 
-        public override int GetHashCode()
+        protected bool Equals(UserAndChannel other)
         {
-            return string.Concat(UserId, ChannelId).GetHashCode();
+            return UserId == other.UserId && ChannelId == other.ChannelId;
         }
 
-        public override bool Equals(object? obj)
+        public override bool Equals(object obj)
         {
-            var userAndChannel = obj as UserAndChannel;
-            return UserId.Equals(userAndChannel.UserId)
-                   && ChannelId.Equals(userAndChannel.ChannelId);
+            if (ReferenceEquals(null, obj)) return false;
+            if (ReferenceEquals(this, obj)) return true;
+            if (obj.GetType() != this.GetType()) return false;
+            return Equals((UserAndChannel) obj);
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(UserId, ChannelId);
         }
     }
 }
