@@ -86,10 +86,10 @@ namespace PlanningPoker.Controllers
                 return BadRequest(new { ok = false, error = "invalid_json" });
             }
 
-            if (request == null || string.IsNullOrEmpty(request.TeamId) || string.IsNullOrEmpty(request.Channel)
+            if (request == null || string.IsNullOrEmpty(request.Channel)
                 || string.IsNullOrEmpty(request.Question) || request.UserIds == null || !request.UserIds.Any())
             {
-                return BadRequest(new { ok = false, error = "teamId, channel, question and at least one userId are required" });
+                return BadRequest(new { ok = false, error = "channel, question and at least one userId are required" });
             }
 
             var (ok, error) = await pollService.CreateConfirmationPollAsync(request.TeamId, request.Channel,
