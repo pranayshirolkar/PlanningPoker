@@ -6,7 +6,7 @@ namespace PlanningPoker
 {
     public static class SignatureVerifier
     {
-        public const string HeaderName = "X-PlanningPoker-Signature";
+        public const string HeaderName = "X-Crmhelper-Signature";
 
         // Verifies header == "sha256=" + hex(HMACSHA256(rawBody, secret)), constant-time.
         public static bool VerifyHmacSha256(string rawBody, string secret, string header)

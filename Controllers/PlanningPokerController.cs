@@ -42,6 +42,14 @@ namespace PlanningPoker.Controllers
             return Ok("Hello from Planning Poker App!");
         }
 
+        // Neutral warm-up/health route for machine-to-machine callers (the STCRM release workflow)
+        // so they don't reference the app name.
+        [HttpGet("/crmhelper/health")]
+        public IActionResult Health()
+        {
+            return Ok("ok");
+        }
+
         [Route("[action]")]
         [HttpPost]
         public async Task<IActionResult> Poker()
@@ -59,10 +67,10 @@ namespace PlanningPoker.Controllers
             return Ok();
         }
 
-        // Machine-to-machine entry point (STCRM release workflow). Authenticated by an HMAC-SHA256
+        // Machine-to-machine entry point (STCRM release workflow). Neutral route (no controller
+        // prefix) so callers don't reference the app name. Authenticated by an HMAC-SHA256
         // signature over the raw body, not by Slack's request signing.
-        [Route("[action]")]
-        [HttpPost]
+        [HttpPost("/crmhelper/poll")]
         public async Task<IActionResult> CreatePoll()
         {
             using var reader = new StreamReader(Request.Body);
