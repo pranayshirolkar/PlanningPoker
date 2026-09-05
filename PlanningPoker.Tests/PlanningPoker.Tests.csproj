@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>disable</Nullable>
     <IsPackable>false</IsPackable>
-    <!-- No .NET 8 runtime on some dev machines; let the net8 test host run on a newer runtime. -->
+    <!-- Let the test host run on a newer patch/major runtime than it was built against. -->
     <RollForward>Major</RollForward>
   </PropertyGroup>
 
