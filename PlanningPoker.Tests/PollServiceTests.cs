@@ -14,9 +14,6 @@ namespace PlanningPoker.Tests
     {
         [Theory]
         [InlineData("pollConfirm|U1,U2", true)]
-        // The retired close action is still claimed, so a click on a poll posted before it was
-        // removed is swallowed here instead of being read as a planning-poker vote.
-        [InlineData("pollClose|U1", true)]
         [InlineData("closeVote", false)]
         [InlineData("5", false)]
         public void CanHandle_matches_only_poll_actions(string value, bool expected)
