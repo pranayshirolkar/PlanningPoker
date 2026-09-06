@@ -100,9 +100,14 @@ namespace PlanningPoker.Controllers
                 return BadRequest(new { ok = false, error = "channel, question and at least one userId are required" });
             }
 
-            var (ok, error) = await pollService.CreateConfirmationPollAsync(request.TeamId, request.Channel,
-                request.ThreadTs, request.Question, request.UserIds.Distinct().ToList());
-            return ok ? Ok(new { ok = true }) : StatusCode(502, new { ok = false, error });
+            var (ok, ts, channel, error) = await pollService.CreateConfirmationPollAsync(request.TeamId,
+                request.Channel, request.ThreadTs, request.Question, request.UserIds.Distinct().ToList());
+
+            // ts identifies the poll: it is the Slack message id, and what ThreadTs expects if the
+            // caller later wants to reply under it.
+            return ok
+                ? Ok(new { ok = true, ts, channel })
+                : StatusCode(502, new { ok = false, error });
         }
 
         private string FormPayload()
