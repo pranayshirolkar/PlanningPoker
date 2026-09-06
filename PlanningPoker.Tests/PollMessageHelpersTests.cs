@@ -13,14 +13,13 @@ namespace PlanningPoker.Tests
         private static readonly List<string> Roster = new() { "U1", "U2", "U3" };
 
         [Fact]
-        public void BuildInitialBlocks_embeds_roster_in_both_button_values()
+        public void BuildInitialBlocks_has_one_button_carrying_the_roster()
         {
             var blocks = PollMessageHelpers.BuildInitialBlocks("Validated?", Roster);
 
-            var closeButton = (Button) ((Section) blocks[0]).Accessory;
+            // Manual close was retired: confirming is the only action on the message.
+            Assert.Null(((Section) blocks[0]).Accessory);
             var confirmButton = (Button) ((Actions) blocks[2]).Elements.Single();
-
-            Assert.Equal("pollClose|U1,U2,U3", closeButton.Value);
             Assert.Equal("pollConfirm|U1,U2,U3", confirmButton.Value);
         }
 
@@ -76,6 +75,37 @@ namespace PlanningPoker.Tests
         }
 
         [Fact]
+        public void ParseConfirmedFromBlocks_round_trips_a_completed_poll()
+        {
+            // A late duplicate click reconstructs from the completed message. If this stopped
+            // returning the full roster, that click would reopen the finished poll at 1/N.
+            var completed = PollMessageHelpers.BuildCompletedUpdate(
+                PollMessageHelpers.BuildInitialBlocks("Validated?", Roster), Roster);
+
+            Assert.Equal(new HashSet<string>(Roster),
+                PollMessageHelpers.ParseConfirmedFromBlocks(completed.Blocks));
+        }
+
+        [Fact]
+        public void ParseConfirmedFromBlocks_reads_the_confirmed_line_not_the_first_line()
+        {
+            // Legacy layout: a poll closed by the retired button carries a header above the confirmed
+            // line. Reading line 0 there parsed the closer as the only confirmer and dropped the rest.
+            var blocks = new List<IMessageBlock>
+            {
+                new Section
+                {
+                    Text = new MarkdownText("*2/3 confirmed.* Closed by <@U9>.\n"
+                                            + ":white_check_mark: *Confirmed*: <@U1> <@U2>\n"
+                                            + ":hourglass_flowing_sand: *Pending*: <@U3>")
+                }
+            };
+
+            Assert.Equal(new HashSet<string> { "U1", "U2" },
+                PollMessageHelpers.ParseConfirmedFromBlocks(blocks));
+        }
+
+        [Fact]
         public void ParseConfirmedFromBlocks_ignores_pending_mentions()
         {
             var blocks = new List<IMessageBlock>
@@ -112,26 +142,31 @@ namespace PlanningPoker.Tests
         }
 
         [Fact]
-        public void BuildClosedUpdate_removes_buttons_and_shows_summary()
+        public void BuildCompletedUpdate_drops_the_button_and_summarises()
         {
             var blocks = PollMessageHelpers.BuildInitialBlocks("Validated?", Roster);
-            var closed = PollMessageHelpers.BuildClosedUpdate(blocks, Roster,
-                new HashSet<string> { "U1", "U2", "U3" }, closedByUserId: "U9");
+            var completed = PollMessageHelpers.BuildCompletedUpdate(blocks, Roster);
 
-            Assert.DoesNotContain(closed.Blocks, b => b is Actions);
-            Assert.Null(((Section) closed.Blocks[0]).Accessory);
-            Assert.Contains("3/3 confirmed", ((Section) closed.Blocks[^1]).Text.Text);
-            Assert.Contains("<@U9>", ((Section) closed.Blocks[^1]).Text.Text);
+            Assert.DoesNotContain(completed.Blocks, b => b is Actions);
+            Assert.Null(((Section) completed.Blocks[0]).Accessory);
+            Assert.Equal("*Validated?*", ((Section) completed.Blocks[0]).Text.Text);
+
+            var summary = ((Section) completed.Blocks[^1]).Text.Text;
+            Assert.Contains("*Confirmed by all 3*", summary);
+            Assert.Contains("<@U1> <@U2> <@U3>", summary);
+            Assert.DoesNotContain("Pending", summary);
         }
 
         [Fact]
-        public void BuildClosedUpdate_autoclose_says_everyone()
+        public void BuildCompletedUpdate_is_idempotent()
         {
-            var blocks = PollMessageHelpers.BuildInitialBlocks("Validated?", Roster);
-            var closed = PollMessageHelpers.BuildClosedUpdate(blocks, Roster,
-                new HashSet<string> { "U1", "U2", "U3" }, closedByUserId: null);
+            // A duplicate or reordered click re-renders a finished poll; the result must not drift.
+            var once = PollMessageHelpers.BuildCompletedUpdate(
+                PollMessageHelpers.BuildInitialBlocks("Validated?", Roster), Roster);
+            var twice = PollMessageHelpers.BuildCompletedUpdate(once.Blocks, Roster);
 
-            Assert.Contains("everyone", ((Section) closed.Blocks[^1]).Text.Text);
+            Assert.Equal(((Section) once.Blocks[0]).Text.Text, ((Section) twice.Blocks[0]).Text.Text);
+            Assert.Equal(((Section) once.Blocks[^1]).Text.Text, ((Section) twice.Blocks[^1]).Text.Text);
         }
     }
 }

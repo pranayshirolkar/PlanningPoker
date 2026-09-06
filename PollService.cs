@@ -34,7 +34,7 @@ namespace PlanningPoker
         public bool CanHandle(string actionValue)
         {
             var (action, _) = PollMessageHelpers.ParseActionValue(actionValue);
-            return action == Constants.PollConfirmAction || action == Constants.PollCloseAction;
+            return action == Constants.PollConfirmAction || action == Constants.RetiredPollCloseAction;
         }
 
         public async Task<(bool ok, string error)> CreateConfirmationPollAsync(string teamId, string channel,
@@ -103,40 +103,37 @@ namespace PlanningPoker
         public async Task HandleInteractionAsync(BlockActionsPayload payload)
         {
             var (action, roster) = PollMessageHelpers.ParseActionValue(payload.Actions.Single().Value);
-            var messageTs = payload.Message.Timestamp.ToString();
-            var confirmedFromBlocks = PollMessageHelpers.ParseConfirmedFromBlocks(payload.Message.Blocks);
-
-            if (action == Constants.PollCloseAction)
+            if (action == Constants.RetiredPollCloseAction)
             {
-                var confirmed = pollStore.ApplyClose(messageTs, roster, confirmedFromBlocks);
-                var closed = PollMessageHelpers.BuildClosedUpdate(payload.Message.Blocks, roster,
-                    new HashSet<string>(confirmed), payload.User.ID);
-                await closed.Send(payload.ResponseUrl);
-                return;
-            }
-
-            var updated = pollStore.ApplyConfirm(messageTs, roster, confirmedFromBlocks, payload.User.ID,
-                out var clickerInRoster);
-            if (!clickerInRoster)
-            {
+                // Only reachable from a poll posted before the button was retired.
                 await MessageHelpers
-                    .CreateEphemeralMessage("You're not in this poll's participant list, so your click wasn't counted.")
+                    .CreateEphemeralMessage("The close button has been retired — this poll closes itself "
+                                            + "once everyone has confirmed.")
                     .Send(payload.ResponseUrl);
                 return;
             }
 
-            var confirmedSet = new HashSet<string>(updated);
-            if (roster.All(confirmedSet.Contains))
+            var confirmedFromBlocks = PollMessageHelpers.ParseConfirmedFromBlocks(payload.Message.Blocks);
+
+            // Rendering runs under the poll's lock, so two people confirming at once can neither drop
+            // a confirmation nor reach Slack out of order. Completion is derived from the confirmed
+            // set rather than stored, which is what makes a duplicate or late click re-render the
+            // finished message instead of reopening it.
+            var counted = await pollStore.ConfirmAsync(payload.Message.Timestamp.ToString(), roster,
+                confirmedFromBlocks, payload.User.ID, async confirmed =>
+                {
+                    var confirmedSet = new HashSet<string>(confirmed);
+                    var message = roster.All(confirmedSet.Contains)
+                        ? PollMessageHelpers.BuildCompletedUpdate(payload.Message.Blocks, roster)
+                        : PollMessageHelpers.BuildActiveUpdate(payload.Message.Blocks, roster, confirmedSet);
+                    await message.Send(payload.ResponseUrl);
+                });
+
+            if (!counted)
             {
-                pollStore.Remove(messageTs);
-                var closed = PollMessageHelpers.BuildClosedUpdate(payload.Message.Blocks, roster, confirmedSet,
-                    closedByUserId: null);
-                await closed.Send(payload.ResponseUrl);
-            }
-            else
-            {
-                var active = PollMessageHelpers.BuildActiveUpdate(payload.Message.Blocks, roster, confirmedSet);
-                await active.Send(payload.ResponseUrl);
+                await MessageHelpers
+                    .CreateEphemeralMessage("You're not in this poll's participant list, so your click wasn't counted.")
+                    .Send(payload.ResponseUrl);
             }
         }
     }

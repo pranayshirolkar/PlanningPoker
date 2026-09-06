@@ -1,28 +1,34 @@
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace PlanningPoker
 {
     // Authoritative confirmed-set state, keyed by the poll message's ts. In-memory is sufficient
-    // because the app runs as a single instance (free-tier Azure App Service, no scale-out); an
-    // in-process lock per message serializes the read-modify-write so simultaneous clicks can't
-    // drop a confirmation. On a cold-start miss the state is reconstructed once from the message
-    // (best-effort) via the confirmedFromBlocks the caller supplies.
+    // because the app runs as a single instance (free-tier Azure App Service, no scale-out); a
+    // per-message semaphore serialises the read-modify-write *and* the Slack render, so simultaneous
+    // clicks can neither drop a confirmation nor land their updates out of order. On a cold-start
+    // miss the state is reconstructed once from the message (best-effort) via the
+    // confirmedFromBlocks the caller supplies.
+    //
+    // Entries are never evicted. Dropping one on completion would hand the next click a fresh state
+    // object while an earlier click still held the old one's semaphore, losing the mutual exclusion
+    // the semaphore exists for. Growth is per poll created, not per interaction: repeat clicks
+    // retain nothing, because HashSet.Add keeps the instance it already holds. Measured at ~2.6 KB
+    // per fully-confirmed five-person poll, so the free tier's headroom is a few hundred thousand
+    // polls — decades at this app's volume, and every deploy starts the count over.
     public interface IPollStore
     {
         void Seed(string messageTs, IEnumerable<string> roster);
 
-        // Adds the clicker (if a roster member) and returns the confirmed snapshot. clickerInRoster
-        // tells the caller whether the click counted.
-        IReadOnlyCollection<string> ApplyConfirm(string messageTs, IReadOnlyList<string> roster,
-            IEnumerable<string> confirmedFromBlocks, string clickerId, out bool clickerInRoster);
-
-        // Returns the confirmed snapshot and forgets the poll.
-        IReadOnlyCollection<string> ApplyClose(string messageTs, IReadOnlyList<string> roster,
-            IEnumerable<string> confirmedFromBlocks);
-
-        void Remove(string messageTs);
+        // Adds the clicker and invokes render with the resulting confirmed set, both under the
+        // poll's lock. Returns false — without rendering — if the clicker isn't in the roster.
+        Task<bool> ConfirmAsync(string messageTs, IReadOnlyList<string> roster,
+            IEnumerable<string> confirmedFromBlocks, string clickerId,
+            Func<IReadOnlyCollection<string>, Task> render);
     }
 
     public class PollStore : IPollStore
@@ -31,42 +37,43 @@ namespace PlanningPoker
 
         public void Seed(string messageTs, IEnumerable<string> roster)
         {
-            store[messageTs] = new PollState(roster, new string[0]);
+            // GetOrAdd, not an assignment: a click can in principle reach the interactivity endpoint
+            // before chat.postMessage has returned here, and clobbering that state would drop the
+            // confirmation it already recorded. Slack ts values are unique, so nothing stale is kept.
+            store.GetOrAdd(messageTs, _ => new PollState(roster, new string[0]));
         }
 
-        public IReadOnlyCollection<string> ApplyConfirm(string messageTs, IReadOnlyList<string> roster,
-            IEnumerable<string> confirmedFromBlocks, string clickerId, out bool clickerInRoster)
+        public async Task<bool> ConfirmAsync(string messageTs, IReadOnlyList<string> roster,
+            IEnumerable<string> confirmedFromBlocks, string clickerId,
+            Func<IReadOnlyCollection<string>, Task> render)
         {
+            // GetOrAdd may run the factory more than once under contention, but every caller gets
+            // back the one instance that was actually stored — so they all share a semaphore.
             var state = store.GetOrAdd(messageTs, _ => new PollState(roster, confirmedFromBlocks));
-            lock (state.Sync)
+
+            // Roster is fixed at construction, so this read needs no lock.
+            if (!state.Roster.Contains(clickerId))
             {
-                clickerInRoster = state.Roster.Contains(clickerId);
-                if (clickerInRoster)
-                {
-                    state.Confirmed.Add(clickerId);
-                }
-
-                return state.Confirmed.ToList();
+                return false;
             }
-        }
 
-        public IReadOnlyCollection<string> ApplyClose(string messageTs, IReadOnlyList<string> roster,
-            IEnumerable<string> confirmedFromBlocks)
-        {
-            var state = store.GetOrAdd(messageTs, _ => new PollState(roster, confirmedFromBlocks));
-            lock (state.Sync)
+            await state.Gate.WaitAsync();
+            try
             {
-                var snapshot = state.Confirmed.ToList();
-                store.TryRemove(messageTs, out _);
-                return snapshot;
+                state.Confirmed.Add(clickerId);
+                await render(state.Confirmed.ToList());
             }
-        }
+            finally
+            {
+                state.Gate.Release();
+            }
 
-        public void Remove(string messageTs) => store.TryRemove(messageTs, out _);
+            return true;
+        }
 
         private sealed class PollState
         {
-            public object Sync { get; } = new();
+            public SemaphoreSlim Gate { get; } = new(1, 1);
             public HashSet<string> Roster { get; }
             public HashSet<string> Confirmed { get; }
 

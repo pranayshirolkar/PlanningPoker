@@ -17,21 +17,18 @@ namespace PlanningPoker
         // never fetch usernames. IDs are U… (or W… on Enterprise Grid).
         private static readonly Regex MentionRegex = new(@"<@([UW][A-Z0-9]+)>");
 
+        // The running tally and the completed summary both put every confirmed mention on a single
+        // line starting with this marker, and ParseConfirmedFromBlocks rebuilds the confirmed set by
+        // finding that line. The three must stay in step: a completed message that no longer parsed
+        // back to the full roster would let a late click reopen a finished poll at 1/N.
+        private const string ConfirmedMarker = ":white_check_mark: *Confirmed";
+
         public static List<IMessageBlock> BuildInitialBlocks(string question, IReadOnlyList<string> roster)
         {
             var rosterCsv = string.Join(",", roster);
             return new List<IMessageBlock>
             {
-                new Section
-                {
-                    Text = new MarkdownText("*" + question + "*"),
-                    Accessory = new Button
-                    {
-                        Text = new PlainText("Close & Reveal"),
-                        Style = ButtonStyle.Danger,
-                        Value = Constants.PollCloseAction + Constants.PollValueSeparator + rosterCsv
-                    }
-                },
+                new Section { Text = new MarkdownText("*" + question + "*") },
                 new Divider(),
                 new Actions
                 {
@@ -57,7 +54,7 @@ namespace PlanningPoker
             var confirmedMentions = roster.Where(confirmed.Contains).Select(Mention).ToList();
             var pendingMentions = roster.Where(id => !confirmed.Contains(id)).Select(Mention).ToList();
 
-            var confirmedLine = $":white_check_mark: *Confirmed {confirmedMentions.Count}/{roster.Count}*"
+            var confirmedLine = $"{ConfirmedMarker} {confirmedMentions.Count}/{roster.Count}*"
                                 + (confirmedMentions.Any() ? ": " + string.Join(" ", confirmedMentions) : "");
             var pendingLine = ":hourglass_flowing_sand: *Pending*"
                               + (pendingMentions.Any() ? ": " + string.Join(" ", pendingMentions) : ": none :tada:");
@@ -68,27 +65,32 @@ namespace PlanningPoker
         public static InteractionMessage BuildActiveUpdate(IList<IMessageBlock> existingBlocks,
             IReadOnlyList<string> roster, ISet<string> confirmed)
         {
-            // Only the tally (last block) changes on a vote — question + buttons are untouched.
+            // Only the tally (last block) changes on a vote — question + button are untouched.
             var message = new InteractionMessage(replaceOriginal: true) { Blocks = existingBlocks };
             message.Blocks[^1] = BuildTallySection(roster, confirmed);
             return message;
         }
 
-        public static InteractionMessage BuildClosedUpdate(IList<IMessageBlock> existingBlocks,
-            IReadOnlyList<string> roster, ISet<string> confirmed, string closedByUserId)
+        // The poll's only terminal state: every expected user has confirmed. The button goes away and
+        // the tally collapses to one line, so the message reads as a settled record. Re-rendering a
+        // message that is already in this state reproduces it exactly, which is what makes a
+        // duplicate or reordered click harmless.
+        public static InteractionMessage BuildCompletedUpdate(IList<IMessageBlock> existingBlocks,
+            IReadOnlyList<string> roster)
         {
-            var message = new InteractionMessage(replaceOriginal: true) { Blocks = existingBlocks };
-            // Drop the accessory (Close button) from the question section.
-            message.Blocks[0] = new Section { Text = new MarkdownText(((Section) existingBlocks[0]).Text.Text) };
-            var closedBy = closedByUserId != null ? Mention(closedByUserId) : "everyone";
-            var header = $"*{confirmed.Count(roster.Contains)}/{roster.Count} confirmed.* Closed by {closedBy}.";
-            message.Blocks = new List<IMessageBlock>
+            var summary = $"{ConfirmedMarker} by all {roster.Count}* — "
+                          + string.Join(" ", roster.Select(Mention));
+            return new InteractionMessage(replaceOriginal: true)
             {
-                message.Blocks[0],
-                new Divider(),
-                new Section { Text = new MarkdownText(header + "\n" + TallyLines(roster, confirmed)) }
+                Blocks = new List<IMessageBlock>
+                {
+                    // Rebuilt rather than reused so any accessory on the original section is dropped:
+                    // polls posted before the close button was retired still carry one.
+                    new Section { Text = new MarkdownText(((Section) existingBlocks[0]).Text.Text) },
+                    new Divider(),
+                    new Section { Text = new MarkdownText(summary) }
+                }
             };
-            return message;
         }
 
         public static (string action, List<string> roster) ParseActionValue(string value)
@@ -127,14 +129,16 @@ namespace PlanningPoker
             }
 
             var tally = blocks.OfType<Section>().LastOrDefault(s => s.Text?.Text != null
-                && s.Text.Text.Contains("*Confirmed"));
+                && s.Text.Text.Contains(ConfirmedMarker));
             if (tally == null)
             {
                 return confirmed;
             }
 
-            // Only the first line (the "Confirmed" line) carries confirmed mentions; pending is line 2.
-            var confirmedLine = tally.Text.Text.Split('\n')[0];
+            // The line is located by content, not position. A completed summary — and a poll closed
+            // by the retired button — carries a header line above the confirmed line, so reading
+            // line 0 there would parse the wrong mentions (the closer, or none at all).
+            var confirmedLine = tally.Text.Text.Split('\n').First(l => l.Contains(ConfirmedMarker));
             foreach (Match m in MentionRegex.Matches(confirmedLine))
             {
                 confirmed.Add(m.Groups[1].Value);
@@ -153,16 +157,5 @@ namespace PlanningPoker
         }
 
         private static string Mention(string userId) => $"<@{userId}>";
-
-        private static string TallyLines(IReadOnlyList<string> roster, ISet<string> confirmed)
-        {
-            var confirmedMentions = roster.Where(confirmed.Contains).Select(Mention).ToList();
-            var pendingMentions = roster.Where(id => !confirmed.Contains(id)).Select(Mention).ToList();
-            var confirmedLine = ":white_check_mark: *Confirmed*"
-                                + (confirmedMentions.Any() ? ": " + string.Join(" ", confirmedMentions) : ": none");
-            var pendingLine = ":hourglass_flowing_sand: *Pending*"
-                              + (pendingMentions.Any() ? ": " + string.Join(" ", pendingMentions) : ": none :tada:");
-            return confirmedLine + "\n" + pendingLine;
-        }
     }
 }

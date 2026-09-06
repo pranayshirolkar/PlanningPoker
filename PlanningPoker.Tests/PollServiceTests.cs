@@ -14,6 +14,8 @@ namespace PlanningPoker.Tests
     {
         [Theory]
         [InlineData("pollConfirm|U1,U2", true)]
+        // The retired close action is still claimed, so a click on a poll posted before it was
+        // removed is swallowed here instead of being read as a planning-poker vote.
         [InlineData("pollClose|U1", true)]
         [InlineData("closeVote", false)]
         [InlineData("5", false)]
@@ -45,9 +47,9 @@ namespace PlanningPoker.Tests
             Assert.Equal("pollConfirm|U1,U2", confirmButton.Value);
 
             // Store seeded under the returned ts, so a roster member's click counts immediately.
-            store.ApplyConfirm(api.LastResponseTs, new List<string> { "U1", "U2" },
-                new string[0], "U1", out var inRoster);
-            Assert.True(inRoster);
+            var counted = await store.ConfirmAsync(api.LastResponseTs, new List<string> { "U1", "U2" },
+                new string[0], "U1", _ => Task.CompletedTask);
+            Assert.True(counted);
         }
 
         [Fact]
