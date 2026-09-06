@@ -34,7 +34,7 @@ namespace PlanningPoker
         public bool CanHandle(string actionValue)
         {
             var (action, _) = PollMessageHelpers.ParseActionValue(actionValue);
-            return action == Constants.PollConfirmAction || action == Constants.RetiredPollCloseAction;
+            return action == Constants.PollConfirmAction;
         }
 
         public async Task<(bool ok, string error)> CreateConfirmationPollAsync(string teamId, string channel,
@@ -102,17 +102,7 @@ namespace PlanningPoker
 
         public async Task HandleInteractionAsync(BlockActionsPayload payload)
         {
-            var (action, roster) = PollMessageHelpers.ParseActionValue(payload.Actions.Single().Value);
-            if (action == Constants.RetiredPollCloseAction)
-            {
-                // Only reachable from a poll posted before the button was retired.
-                await MessageHelpers
-                    .CreateEphemeralMessage("The close button has been retired — this poll closes itself "
-                                            + "once everyone has confirmed.")
-                    .Send(payload.ResponseUrl);
-                return;
-            }
-
+            var (_, roster) = PollMessageHelpers.ParseActionValue(payload.Actions.Single().Value);
             var confirmedFromBlocks = PollMessageHelpers.ParseConfirmedFromBlocks(payload.Message.Blocks);
 
             // Rendering runs under the poll's lock, so two people confirming at once can neither drop

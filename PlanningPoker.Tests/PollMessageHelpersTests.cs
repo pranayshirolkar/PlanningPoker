@@ -50,7 +50,7 @@ namespace PlanningPoker.Tests
 
         [Theory]
         [InlineData("pollConfirm|U1,U2", "pollConfirm", new[] { "U1", "U2" })]
-        [InlineData("pollClose|U1", "pollClose", new[] { "U1" })]
+        [InlineData("someAction|U1", "someAction", new[] { "U1" })]
         [InlineData("pollConfirm|", "pollConfirm", new string[0])]
         [InlineData("closeVote", "closeVote", new string[0])]
         [InlineData("", "", new string[0])]
