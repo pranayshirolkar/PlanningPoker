@@ -16,10 +16,7 @@ namespace PlanningPoker
     //
     // Entries are never evicted. Dropping one on completion would hand the next click a fresh state
     // object while an earlier click still held the old one's semaphore, losing the mutual exclusion
-    // the semaphore exists for. Growth is per poll created, not per interaction: repeat clicks
-    // retain nothing, because HashSet.Add keeps the instance it already holds. Measured at ~2.6 KB
-    // per fully-confirmed five-person poll, so the free tier's headroom is a few hundred thousand
-    // polls — decades at this app's volume, and every deploy starts the count over.
+    // the semaphore exists for. Growth is per poll created, not per interaction. See #3.
     public interface IPollStore
     {
         void Seed(string messageTs, IEnumerable<string> roster);
@@ -37,9 +34,8 @@ namespace PlanningPoker
 
         public void Seed(string messageTs, IEnumerable<string> roster)
         {
-            // GetOrAdd, not an assignment: a click can in principle reach the interactivity endpoint
-            // before chat.postMessage has returned here, and clobbering that state would drop the
-            // confirmation it already recorded. Slack ts values are unique, so nothing stale is kept.
+            // GetOrAdd, not an assignment: a click can reach the interactivity endpoint before
+            // chat.postMessage has returned here, and clobbering would drop what it recorded.
             store.GetOrAdd(messageTs, _ => new PollState(roster, new string[0]));
         }
 

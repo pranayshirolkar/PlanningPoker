@@ -30,11 +30,16 @@ namespace PlanningPoker.Tests
             var store = new PollStore();
             var service = new PollService(new FakeSlackApiFactory(api), store);
 
-            var (ok, error) = await service.CreateConfirmationPollAsync("T1", "C1", "1720531234.567890",
-                "Validated?", new List<string> { "U1", "U2" });
+            var (ok, ts, channel, error) = await service.CreateConfirmationPollAsync("T1", "C1",
+                "1720531234.567890", "Validated?", new List<string> { "U1", "U2" });
 
             Assert.True(ok);
             Assert.Null(error);
+
+            // The caller needs the poll's identity back: ts is the Slack message id and the store
+            // key, and is what ThreadTs expects to reply under the poll later.
+            Assert.Equal("111.222", ts);
+            Assert.Equal("C0RESOLVED", channel);
 
             // Threaded into the release message.
             Assert.Equal("1720531234.567890", api.LastRequest.ThreadId.ToString());
@@ -67,11 +72,15 @@ namespace PlanningPoker.Tests
             var api = new FakeSlackApi { Ok = false, Error = "channel_not_found" };
             var service = new PollService(new FakeSlackApiFactory(api), new PollStore());
 
-            var (ok, error) = await service.CreateConfirmationPollAsync("T1", "C1", null, "Q?",
+            var (ok, ts, channel, error) = await service.CreateConfirmationPollAsync("T1", "C1", null, "Q?",
                 new List<string> { "U1" });
 
             Assert.False(ok);
             Assert.Equal("channel_not_found", error);
+
+            // Nothing was posted, so there is no poll to identify.
+            Assert.Null(ts);
+            Assert.Null(channel);
         }
 
         private sealed class FakeSlackApiFactory : ISlackApiFactory
@@ -99,7 +108,9 @@ namespace PlanningPoker.Tests
                 {
                     OK = Ok,
                     Error = Error,
-                    Timestamp = new Timestamp(111, "222")
+                    Timestamp = new Timestamp(111, "222"),
+                    // Slack resolves the channel; it need not match what the caller passed in.
+                    Channel = "C0RESOLVED"
                 });
             }
 

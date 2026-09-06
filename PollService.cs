@@ -12,8 +12,10 @@ namespace PlanningPoker
         // endpoint can route it here instead of to the planning-poker handler).
         bool CanHandle(string actionValue);
 
-        Task<(bool ok, string error)> CreateConfirmationPollAsync(string teamId, string channel,
-            string threadTs, string question, IReadOnlyList<string> roster);
+        // ts and channel identify the poll for linking to it or threading onto it later; channel is
+        // Slack's resolved id, not necessarily the one passed in. Both are null when ok is false.
+        Task<(bool ok, string ts, string channel, string error)> CreateConfirmationPollAsync(string teamId,
+            string channel, string threadTs, string question, IReadOnlyList<string> roster);
 
         Task HandleSlashCommandAsync(string payload);
 
@@ -37,8 +39,8 @@ namespace PlanningPoker
             return action == Constants.PollConfirmAction;
         }
 
-        public async Task<(bool ok, string error)> CreateConfirmationPollAsync(string teamId, string channel,
-            string threadTs, string question, IReadOnlyList<string> roster)
+        public async Task<(bool ok, string ts, string channel, string error)> CreateConfirmationPollAsync(
+            string teamId, string channel, string threadTs, string question, IReadOnlyList<string> roster)
         {
             var request = new PostMessageRequest
             {
@@ -53,11 +55,12 @@ namespace PlanningPoker
             var response = await slackApiFactory.CreateForTeamId(teamId).SendMessageAsync(request);
             if (!response.OK)
             {
-                return (false, response.Error);
+                return (false, null, null, response.Error);
             }
 
-            pollStore.Seed(response.Timestamp.ToString(), roster);
-            return (true, null);
+            var ts = response.Timestamp.ToString();
+            pollStore.Seed(ts, roster);
+            return (true, ts, response.Channel, null);
         }
 
         public async Task HandleSlashCommandAsync(string payload)
@@ -89,7 +92,7 @@ namespace PlanningPoker
                 return;
             }
 
-            var (ok, error) = await CreateConfirmationPollAsync(command.TeamId, command.ChannelId,
+            var (ok, _, _, error) = await CreateConfirmationPollAsync(command.TeamId, command.ChannelId,
                 threadTs: null, question, roster);
             if (!ok)
             {
@@ -105,10 +108,8 @@ namespace PlanningPoker
             var (_, roster) = PollMessageHelpers.ParseActionValue(payload.Actions.Single().Value);
             var confirmedFromBlocks = PollMessageHelpers.ParseConfirmedFromBlocks(payload.Message.Blocks);
 
-            // Rendering runs under the poll's lock, so two people confirming at once can neither drop
-            // a confirmation nor reach Slack out of order. Completion is derived from the confirmed
-            // set rather than stored, which is what makes a duplicate or late click re-render the
-            // finished message instead of reopening it.
+            // Completion is derived from the confirmed set rather than stored, so a duplicate or late
+            // click re-renders the finished message instead of reopening it.
             var counted = await pollStore.ConfirmAsync(payload.Message.Timestamp.ToString(), roster,
                 confirmedFromBlocks, payload.User.ID, async confirmed =>
                 {

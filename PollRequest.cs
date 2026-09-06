@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace PlanningPoker
 {
-    // Body of POST /PlanningPoker/CreatePoll (called by the STCRM release workflow).
+    // Body of POST /crmhelper/poll (called by the STCRM release workflow).
     public class PollRequest
     {
         // Optional: single-workspace deployments omit it and the app uses its sole configured token.

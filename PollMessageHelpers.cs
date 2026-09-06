@@ -65,16 +65,11 @@ namespace PlanningPoker
         public static InteractionMessage BuildActiveUpdate(IList<IMessageBlock> existingBlocks,
             IReadOnlyList<string> roster, ISet<string> confirmed)
         {
-            // Only the tally (last block) changes on a vote — question + button are untouched.
             var message = new InteractionMessage(replaceOriginal: true) { Blocks = existingBlocks };
             message.Blocks[^1] = BuildTallySection(roster, confirmed);
             return message;
         }
 
-        // The poll's only terminal state: every expected user has confirmed. The button goes away and
-        // the tally collapses to one line, so the message reads as a settled record. Re-rendering a
-        // message that is already in this state reproduces it exactly, which is what makes a
-        // duplicate or reordered click harmless.
         public static InteractionMessage BuildCompletedUpdate(IList<IMessageBlock> existingBlocks,
             IReadOnlyList<string> roster)
         {
@@ -84,9 +79,7 @@ namespace PlanningPoker
             {
                 Blocks = new List<IMessageBlock>
                 {
-                    // Rebuilt rather than reused so any accessory on the original section is dropped:
-                    // polls posted before the close button was retired still carry one.
-                    new Section { Text = new MarkdownText(((Section) existingBlocks[0]).Text.Text) },
+                    existingBlocks[0],
                     new Divider(),
                     new Section { Text = new MarkdownText(summary) }
                 }
@@ -135,9 +128,8 @@ namespace PlanningPoker
                 return confirmed;
             }
 
-            // The line is located by content, not position. A completed summary — and a poll closed
-            // by the retired button — carries a header line above the confirmed line, so reading
-            // line 0 there would parse the wrong mentions (the closer, or none at all).
+            // Located by content rather than line position, so adding a line to either layout can't
+            // silently change which mentions are read.
             var confirmedLine = tally.Text.Text.Split('\n').First(l => l.Contains(ConfirmedMarker));
             foreach (Match m in MentionRegex.Matches(confirmedLine))
             {
