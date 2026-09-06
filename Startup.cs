@@ -30,8 +30,10 @@ namespace PlanningPoker
                 ;
             
             services.AddSingleton<IPokerHandRepository, PokerHandRepository>();
+            services.AddSingleton<IPollStore, PollStore>();
             services.AddTransient<ITokenReader, TokenReader>();
             services.AddTransient<ISlackApiFactory, SlackApiFactory>();
+            services.AddTransient<IPollService, PollService>();
             services.AddTransient<IPokerHandService, PokerHandService>();
         }
 

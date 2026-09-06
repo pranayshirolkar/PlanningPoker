@@ -6,6 +6,13 @@
 
   <ItemGroup>
     <PackageReference Include="Slack.NetStandard" Version="2.0.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <!-- The test project lives in a subfolder; keep it out of the web app's default **/*.cs glob. -->
+  <ItemGroup>
+    <Compile Remove="PlanningPoker.Tests/**/*.cs" />
+    <Content Remove="PlanningPoker.Tests/**" />
   </ItemGroup>
 
 

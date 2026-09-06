@@ -18,6 +18,7 @@ namespace PlanningPoker
     {
         private readonly IPokerHandRepository pokerHandRepository;
         private readonly ISlackApiFactory slackApiFactory;
+        private readonly IPollService pollService;
 
         public async Task HandleSlashCommandAsync(string payload)
         {
@@ -155,6 +156,13 @@ namespace PlanningPoker
         {
             var p = (BlockActionsPayload) JsonConvert.DeserializeObject<InteractionPayload>(payload);
 
+            // Confirmation-poll buttons ride the same interactivity Request URL as planning poker.
+            if (pollService.CanHandle(p.Actions.Single().Value))
+            {
+                await pollService.HandleInteractionAsync(p);
+                return;
+            }
+
             if (p.Actions.Single().Value == Constants.CloseVote)
             {
                 await CloseVoteAsync(p, p.User.Username);
@@ -206,10 +214,12 @@ namespace PlanningPoker
             pokerHandRepository.DeleteHand(p.Message.Timestamp.ToString());
         }
 
-        public PokerHandService(IPokerHandRepository pokerHandRepository, ISlackApiFactory slackApiFactory)
+        public PokerHandService(IPokerHandRepository pokerHandRepository, ISlackApiFactory slackApiFactory,
+            IPollService pollService)
         {
             this.pokerHandRepository = pokerHandRepository;
             this.slackApiFactory = slackApiFactory;
+            this.pollService = pollService;
         }
     }
 }
