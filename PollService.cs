@@ -110,7 +110,9 @@ namespace PlanningPoker
 
             // Completion is derived from the confirmed set rather than stored, so a duplicate or late
             // click re-renders the finished message instead of reopening it.
-            var counted = await pollStore.ConfirmAsync(payload.Message.Timestamp.ToString(), roster,
+            // A non-participant's click is a no-op: anything posted to this response_url, even an
+            // ephemeral notice, replaces the poll for everyone.
+            await pollStore.ConfirmAsync(payload.Message.Timestamp.ToString(), roster,
                 confirmedFromBlocks, payload.User.ID, async confirmed =>
                 {
                     var confirmedSet = new HashSet<string>(confirmed);
@@ -119,13 +121,6 @@ namespace PlanningPoker
                         : PollMessageHelpers.BuildActiveUpdate(payload.Message.Blocks, roster, confirmedSet);
                     await message.Send(payload.ResponseUrl);
                 });
-
-            if (!counted)
-            {
-                await MessageHelpers
-                    .CreateEphemeralMessage("You're not in this poll's participant list, so your click wasn't counted.")
-                    .Send(payload.ResponseUrl);
-            }
         }
     }
 }

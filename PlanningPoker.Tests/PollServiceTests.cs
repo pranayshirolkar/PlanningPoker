@@ -1,8 +1,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using PlanningPoker;
 using Slack.NetStandard;
+using Slack.NetStandard.Interaction;
 using Slack.NetStandard.Messages.Blocks;
 using Slack.NetStandard.Messages.Elements;
 using Slack.NetStandard.WebApi.Chat;
@@ -81,6 +83,26 @@ namespace PlanningPoker.Tests
             // Nothing was posted, so there is no poll to identify.
             Assert.Null(ts);
             Assert.Null(channel);
+        }
+
+        [Fact]
+        public async Task HandleInteraction_non_participant_click_sends_nothing()
+        {
+            var store = new PollStore();
+            store.Seed("111.222", new[] { "U1" });
+            var service = new PollService(new FakeSlackApiFactory(new FakeSlackApi()), store);
+
+            // Anything posted to response_url replaces the poll for everyone, and this one refuses
+            // connections, so a send fails the test.
+            var payload = JsonConvert.DeserializeObject<BlockActionsPayload>(@"{
+                ""type"": ""block_actions"",
+                ""user"": { ""id"": ""U_OUTSIDER"" },
+                ""response_url"": ""http://127.0.0.1:1/"",
+                ""message"": { ""ts"": ""111.222"", ""blocks"": [] },
+                ""actions"": [ { ""type"": ""button"", ""value"": ""pollConfirm|U1"" } ]
+            }");
+
+            await service.HandleInteractionAsync(payload);
         }
 
         private sealed class FakeSlackApiFactory : ISlackApiFactory
